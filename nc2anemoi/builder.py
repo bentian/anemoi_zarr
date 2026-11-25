@@ -20,7 +20,7 @@ from .writer import (compute_statistics, create_data_array, log_summary, open_ou
 LOG = logging.getLogger(__name__)
 
 # Read slightly outside the period so ffill / interpolation have neighbours.
-MIN_READ_BUFFER = pd.Timedelta(days=32)
+MIN_READ_BUFFER = pd.Timedelta(days=1)
 
 
 def _prepare_output(path: str, overwrite: bool) -> str:
@@ -36,9 +36,8 @@ def _process_source(src: dict, entries: list[VarEntry], target: Target,
                     data, block: int) -> dict:
     """Read, regrid and time-align one source and write it; returns variable metadata."""
     LOG.info("source %d: %s (%s)", entries[0].source, src["path"], src["pattern"])
-    # buffer = max(target.step, MIN_READ_BUFFER)
-    # arrays, attrs = read_source(src, target.dates[0] - buffer, target.dates[-1] + buffer)
-    arrays, attrs = read_source(src, target.dates[0], target.dates[-1])
+    buffer = max(target.step, MIN_READ_BUFFER)
+    arrays, attrs = read_source(src, target.dates[0] - buffer, target.dates[-1] + buffer)
 
     metadata, aligned = {}, []
     for entry in entries:
@@ -46,6 +45,17 @@ def _process_source(src: dict, entries: list[VarEntry], target: Target,
                     src["regrid_method"])
         da, used = align_time(da, target.dates, target.step, src["time_method"])
         values = da.values.reshape(target.ntime, target.ncell)
+
+        all_nan = np.isnan(values).all(axis=1)
+        if all_nan.any():
+            LOG.warning(
+                "%s: all-NaN dates: %d/%d, missing dates: %s",
+                entry.name,
+                all_nan.sum(),
+                target.ntime,
+                target.dates[all_nan].strftime("%Y-%m-%d").tolist(),
+            )
+
         LOG.info("  %-12s -> %-12s time=%s, all-NaN dates: %d/%d", entry.source_name,
                  entry.name, used, int(np.isnan(values).all(axis=1).sum()), target.ntime)
         metadata[entry.name] = {
