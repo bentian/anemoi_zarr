@@ -1,0 +1,40 @@
+# Config for build_anemoi_zarr.py
+output: /lfs/archive/anemoi/tccip_era5land_2000_2015.zarr
+
+# Time period (inclusive). YYYYMM or YYYYMMDD.
+# "201512" as the end means up to and including 2015-12-31.
+period: ["200001", "201512"]
+
+# Time step of the output dataset. Must be a fixed step (e.g. 1D, 6h, 24h).
+frequency: 1D
+
+# Target grid that every variable gets interpolated onto.
+# Option A: use the grid of one of the sources (index into `sources`).
+grid:
+  reference: 0
+  method: linear          # default regrid method: linear | nearest
+# Option B: define the grid explicitly (start, stop, step), inclusive.
+# grid:
+#   lat: [21.85, 25.35, 0.05]
+#   lon: [119.95, 122.05, 0.05]
+#   method: linear
+
+sources:
+  - path: /lfs/archive/TCCIP_data/grid/day/0.05deg
+    pattern: "tmax.*.nc"   # glob pattern inside `path` (default "*.nc", "**/*.nc" = recursive)
+    variables: ["dis", "std"]
+    # Optional: output names, so dis/std from tmax and tmin files don't clash.
+    rename: {dis: tmax_dis, std: tmax_std}
+
+  - path: /lfs/archive/Reanalysis/ERA5-Land
+    pattern: "*.nc"
+    variables: ["swvl1", "swvl2"]
+    # Monthly data -> daily output: each day gets its month's value.
+    # time_method: auto | exact | ffill | nearest | interpolate | mean
+    time_method: auto
+    regrid_method: linear
+
+# Optional metadata copied into the zarr attributes
+description: "TCCIP 0.05deg daily + ERA5-Land soil water, Taiwan"
+licence: "unknown"
+attribution: "TCCIP, ECMWF"
