@@ -1,0 +1,65 @@
+# Time period (inclusive). YYYYMM or YYYYMMDD.
+# "201512" as the end means up to and including 2015-12-31.
+period: ["200101", "200101"]
+
+# Time step of the output dataset. Must be a fixed step (e.g. 1D, 6h, 24h).
+frequency: 1D
+
+# Target grid that every variable gets interpolated onto.
+grid:
+  # Option A: use the grid of one of the sources (index into `sources`).
+  # reference: 0 # ERA5 native grid is 720x1440
+
+  # Option B: define the grid explicitly (start, stop, step), inclusive.
+  lat: [5, 40, 0.25]
+  lon: [100, 140, 0.25]
+
+  method: linear # default regrid method: linear | nearest
+
+sources:
+  ###
+  # ERA5 (PRS)
+  ###
+  - path: ../data/
+    pattern: # glob pattern inside `path` (default "*.nc", "**/*.nc" = recursive)
+      ### 2001 - 2003
+      "ERA5_*.nc"
+      ### 2001 - 2010
+      #  - "[qtuvz]/200[1-9]/ERA5_*.nc"
+      #  - "[qtuvz]/2010/ERA5_*.nc"
+      ### 1980 - 2024
+      #  - "[qtuvz]/19[89][0-9]/ERA5_*.nc"
+      #  - "[qtuvz]/20[01][0-9]/ERA5_*.nc"
+      #  - "[qtuvz]/202[0-4]/ERA5_*.nc"
+    variables:
+      z: [500]
+      v: [850]
+      u: [850]
+      t: [850]
+      q: [850]
+    level_coord: level
+    time_method: mean
+
+  ###
+  # ERA5-Land
+  ###
+  - path: ../data/
+    pattern: "ERA5-Land_*.nc" # glob pattern inside `path` (default "*.nc", "**/*.nc" = recursive)
+    variables:
+      - swvl1
+      - swvl2
+      - swvl3
+
+  ###
+  # Taiwan observation grid data
+  ###
+  - path: ../data/
+    pattern: "tavg.*.nc" # glob pattern inside `path` (default "*.nc", "**/*.nc" = recursive)
+    variables:
+      - temp
+    rename: { "temp": "tavg" }
+
+# Optional metadata copied into the zarr attributes
+description: "Anemoi Zarr for HeatSense"
+licence: "unknown"
+attribution: "TCCIP, ECMWF"
