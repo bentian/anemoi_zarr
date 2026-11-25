@@ -49,11 +49,25 @@ def _validate_source(i: int, src: dict, default_regrid: str) -> None:
     """Check one ``sources`` entry and fill in its defaults."""
     if "path" not in src or "variables" not in src:
         raise ValueError(f"source #{i} needs 'path' and 'variables'")
+
+    # Variables and pressure levels
     if isinstance(src["variables"], str):
         src["variables"] = [src["variables"]]
     variable_specs(src)  # validate variable/level mapping
     src.setdefault("level_coord", "level")
+
+    # File patterns
     src.setdefault("pattern", "*.nc")
+    if isinstance(src["pattern"], str):
+        src["pattern"] = [src["pattern"]]
+    if not (
+        isinstance(src["pattern"], list)
+        and src["pattern"]
+        and all(isinstance(p, str) for p in src["pattern"])
+    ):
+        raise ValueError("'pattern' must be a string or a non-empty list of strings")
+
+    # Others
     src.setdefault("rename", {})
     src.setdefault("time_method", "auto")
     src.setdefault("regrid_method", default_regrid)

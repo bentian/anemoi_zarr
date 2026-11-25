@@ -3,7 +3,7 @@ output: ./anemoi.zarr
 
 # Time period (inclusive). YYYYMM or YYYYMMDD.
 # "201512" as the end means up to and including 2015-12-31.
-period: ["200101", "200101"]
+period: ["200101", "200103"]
 
 # Time step of the output dataset. Must be a fixed step (e.g. 1D, 6h, 24h).
 frequency: 1D
@@ -21,10 +21,19 @@ grid:
 
 sources:
   ###
-  # ERA5
+  # ERA5 (PRS)
   ###
-  - path: ./data # /lfs/archive/Reanalysis/ERA5
-    pattern: "ERA5_*.nc" # glob pattern inside `path` (default "*.nc", "**/*.nc" = recursive)
+  - path: /lfs/archive/Reanalysis/ERA5/PRS/day/
+    pattern: # glob pattern inside `path` (default "*.nc", "**/*.nc" = recursive)
+      ### 2001 - 2003
+      "[qtuvz]/200[1-3]/ERA5_*.nc"
+      ### 2001 - 2010
+      #  - "[qtuvz]/200[1-9]/ERA5_*.nc"
+      #  - "[qtuvz]/2010/ERA5_*.nc"
+      ### 1980 - 2024
+      #  - "[qtuvz]/19[89][0-9]/ERA5_*.nc"
+      #  - "[qtuvz]/20[01][0-9]/ERA5_*.nc"
+      #  - "[qtuvz]/202[0-4]/ERA5_*.nc"
     variables:
       z: [500]
       v: [850]
@@ -37,7 +46,7 @@ sources:
   ###
   # ERA5-Land
   ###
-  - path: ./data # /lfs/archive/Reanalysis/ERA5-Land/soil
+  - path: /lfs/archive/Reanalysis/ERA5-Land/soil/
     pattern: "ERA5-Land_*.nc" # glob pattern inside `path` (default "*.nc", "**/*.nc" = recursive)
     variables:
       - swvl1
@@ -47,12 +56,11 @@ sources:
   ###
   # Taiwan observation grid data
   ###
-  - path: ./data # /lfs/archive/TCCIP_data/grid/day/0.05deg/tavg/v1
+  - path: /lfs/archive/TCCIP_data/grid/day/0.05deg/tavg/v1/
     pattern: "tavg.*.nc" # glob pattern inside `path` (default "*.nc", "**/*.nc" = recursive)
     variables:
-      - dis
-      - std
-    rename: { "dis": "tavg_dis", "std": "tavg_std" }
+      - temp
+    rename: { "temp": "tavg" }
 
 # Optional metadata copied into the zarr attributes
 description: "Anemoi Zarr for HeatSense"

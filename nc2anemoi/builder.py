@@ -36,8 +36,9 @@ def _process_source(src: dict, entries: list[VarEntry], target: Target,
                     data, block: int) -> dict:
     """Read, regrid and time-align one source and write it; returns variable metadata."""
     LOG.info("source %d: %s (%s)", entries[0].source, src["path"], src["pattern"])
-    buffer = max(target.step, MIN_READ_BUFFER)
-    arrays, attrs = read_source(src, target.dates[0] - buffer, target.dates[-1] + buffer)
+    # buffer = max(target.step, MIN_READ_BUFFER)
+    # arrays, attrs = read_source(src, target.dates[0] - buffer, target.dates[-1] + buffer)
+    arrays, attrs = read_source(src, target.dates[0], target.dates[-1])
 
     metadata, aligned = {}, []
     for entry in entries:

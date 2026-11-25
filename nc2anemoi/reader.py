@@ -27,13 +27,23 @@ def find_name(ds: xr.Dataset, candidates, what: str, filename: str) -> str:
             return name
     raise KeyError(f"no {what} coordinate ({'/'.join(candidates)}) in {filename}")
 
-
 def list_files(src: dict) -> list[str]:
-    """Sorted list of files matching the source path and pattern."""
-    pattern = os.path.join(src["path"], src["pattern"])
-    files = sorted(glob.glob(pattern, recursive=True))
+    """List NetCDF files matching one or more glob patterns."""
+    patterns = src.get("pattern", "*.nc")
+    if isinstance(patterns, str):
+        patterns = [patterns]
+
+    files = sorted({
+        f
+        for pattern in patterns
+        for f in glob.glob(
+            os.path.join(src["path"], pattern),
+            recursive=True,
+        )
+    })
     if not files:
-        raise FileNotFoundError(f"no files match {pattern}")
+        raise FileNotFoundError(f"No files found: {src['path']}, patterns={patterns}")
+
     return files
 
 
