@@ -10,6 +10,7 @@ import pandas as pd
 import xarray as xr
 
 from .timeutils import decode_time
+from .config import variable_specs
 
 LOG = logging.getLogger(__name__)
 
@@ -58,19 +59,40 @@ def read_grid(src: dict) -> tuple[np.ndarray, np.ndarray]:
     """Ascending lat/lon of the first file holding one of the source variables."""
     for path in list_files(src):
         with xr.open_dataset(path, decode_times=False) as ds:
-            if any(v in ds.data_vars for v in src["variables"]):
+            if any(v in ds.data_vars for v, _, _ in variable_specs(src)):
                 lat = ds[find_name(ds, LAT_NAMES, "latitude", path)].values
                 lon = ds[find_name(ds, LON_NAMES, "longitude", path)].values
                 return np.sort(lat.astype("float64")), np.sort(lon.astype("float64"))
     raise ValueError(f"none of {src['variables']} found under {src['path']}")
 
 
-def _read_file(path: str, variables: list[str], t0: pd.Timestamp,
+def select_level(ds: xr.Dataset, da: xr.DataArray, coord: str,
+                 level: int, filename: str) -> xr.DataArray:
+    """Select an exact pressure in hPa, including auxiliary coordinates."""
+    if coord not in ds.variables:
+        raise ValueError(f"{filename}: missing pressure coordinate {coord!r}")
+    pressure = ds[coord]
+    if pressure.ndim != 1 or pressure.dims[0] not in da.dims:
+        raise ValueError(f"{filename}: {coord!r} must be a 1D coordinate of {da.name}")
+    units = str(pressure.attrs.get("units", "")).strip().lower()
+    values = np.asarray(pressure.values, dtype=float)
+    if units in ("pa", "pascal", "pascals"):
+        values = values / 100
+    elif units not in ("hpa", "hectopascal", "hectopascals", "mb", "mbar", "millibar", "millibars"):
+        raise ValueError(f"{filename}: unsupported pressure units {units!r}")
+    idx = np.flatnonzero(np.isclose(values, level, rtol=0, atol=1e-4))
+    if idx.size != 1:
+        raise ValueError(f"{filename}: {da.name} requires exactly one {level} hPa level; found {idx.size}")
+    return da.isel({pressure.dims[0]: int(idx[0])}, drop=True)
+
+
+def _read_file(path: str, src: dict, t0: pd.Timestamp,
                t1: pd.Timestamp) -> list[tuple[str, xr.DataArray, dict]]:
     """Read the requested variables of one file within [t0, t1]."""
     # decode_times=False still applies _FillValue / missing_value masking
     with xr.open_dataset(path, decode_times=False) as ds:
-        present = [v for v in variables if v in ds.data_vars]
+        present = [(v, level, key) for v, level, key in variable_specs(src)
+                   if v in ds.data_vars]
         if not present:
             return []
         tname = find_name(ds, TIME_NAMES, "time", path)
@@ -83,11 +105,18 @@ def _read_file(path: str, variables: list[str], t0: pd.Timestamp,
                  find_name(ds, LON_NAMES, "longitude", path): "lon"}
         LOG.info("  %s: %s, %d steps", os.path.basename(path), present, idx.size)
         out = []
-        for var in present:
-            da = ds[var].isel({tname: idx}).assign_coords({tname: times[idx]})
+        for var, level, key in present:
+            da = ds[var]
+            if level is not None:
+                da = select_level(ds, da, src.get("level_coord", "level"), level, path)
+            da = da.isel({tname: idx}).assign_coords({tname: times[idx]})
             da = standardise(da, names, var, path).astype("float32").load()
             attrs = {k: str(a) for k, a in ds[var].attrs.items() if k in KEPT_ATTRS}
-            out.append((var, da, attrs))
+            attrs["source_name"] = var
+            if level is not None:
+                attrs["pressure_level"] = level
+                attrs["pressure_level_units"] = "hPa"
+            out.append((key, da, attrs))
     return out
 
 
@@ -106,10 +135,10 @@ def _combine(var: str, pieces: list[xr.DataArray], src: dict) -> xr.DataArray:
 
 def read_source(src: dict, t0: pd.Timestamp, t1: pd.Timestamp):
     """Return ({variable: DataArray(time, lat, lon)}, {variable: attrs}) for [t0, t1]."""
-    pieces = {v: [] for v in src["variables"]}
+    pieces = {key: [] for _, _, key in variable_specs(src)}
     attrs = {}
     for path in list_files(src):
-        for var, da, var_attrs in _read_file(path, src["variables"], t0, t1):
+        for var, da, var_attrs in _read_file(path, src, t0, t1):
             pieces[var].append(da)
             attrs.setdefault(var, var_attrs)
 

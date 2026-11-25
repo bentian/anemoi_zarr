@@ -16,7 +16,7 @@ class VarEntry(NamedTuple):
 
     index: int          # position in the output ``variables`` list
     name: str           # output name (after rename)
-    source_name: str    # name inside the NetCDF files
+    source_name: str    # internal source key (e.g. v_850)
     source: int         # index of the source in the config
 
 
@@ -51,6 +51,8 @@ def _validate_source(i: int, src: dict, default_regrid: str) -> None:
         raise ValueError(f"source #{i} needs 'path' and 'variables'")
     if isinstance(src["variables"], str):
         src["variables"] = [src["variables"]]
+    variable_specs(src)  # validate variable/level mapping
+    src.setdefault("level_coord", "level")
     src.setdefault("pattern", "*.nc")
     src.setdefault("rename", {})
     src.setdefault("time_method", "auto")
@@ -59,12 +61,45 @@ def _validate_source(i: int, src: dict, default_regrid: str) -> None:
         raise ValueError(f"source #{i}: time_method must be one of {TIME_METHODS}")
 
 
+def variable_specs(src: dict):
+    """Return (NetCDF name, pressure in hPa or None, internal key)."""
+    variables = src["variables"]
+    if isinstance(variables, str):
+        variables = [variables]
+    if isinstance(variables, list):
+        items = [(v, None) for v in variables]
+    elif isinstance(variables, dict):
+        items = variables.items()
+    else:
+        raise ValueError("variables must be a list or mapping")
+    specs = []
+    for var, levels in items:
+        if not isinstance(var, str) or not var:
+            raise ValueError("variable names must be nonempty strings")
+        if levels is None:
+            specs.append((var, None, var))
+            continue
+        if not isinstance(levels, list) or not levels:
+            raise ValueError(f"{var}: expected a nonempty list of pressure levels or null")
+        for level in levels:
+            if type(level) is not int or level <= 0:
+                raise ValueError(f"{var}: pressure levels must be positive integer hPa")
+            specs.append((var, level, f"{var}_{level}"))
+    keys = [key for _, _, key in specs]
+    if not keys or len(keys) != len(set(keys)):
+        raise ValueError("empty or duplicate expanded source variables")
+    return specs
+
+
 def output_variables(cfg: dict) -> list[VarEntry]:
     """Flatten all sources into the ordered list of output variables."""
     entries = []
     for i, src in enumerate(cfg["sources"]):
-        for var in src["variables"]:
-            entries.append(VarEntry(len(entries), src["rename"].get(var, var), var, i))
+        rename = src.get("rename", {})
+        for var, level, key in variable_specs(src):
+            base = rename.get(var, var)
+            name = base if level is None else f"{base}_{level}"
+            entries.append(VarEntry(len(entries), rename.get(key, name), key, i))
     return entries
 
 
