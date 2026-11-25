@@ -1,6 +1,3 @@
-# Config for build_anemoi_zarr.py
-output: ./anemoi.zarr
-
 # Time period (inclusive). YYYYMM or YYYYMMDD.
 # "201512" as the end means up to and including 2015-12-31.
 period: ["200101", "200103"]
