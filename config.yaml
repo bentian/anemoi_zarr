@@ -20,6 +20,9 @@ grid:
   method: linear # default regrid method: linear | nearest
 
 sources:
+  ###
+  # ERA5
+  ###
   - path: ./data # /lfs/archive/Reanalysis/ERA5
     pattern: "ERA5_*.nc" # glob pattern inside `path` (default "*.nc", "**/*.nc" = recursive)
     variables:
@@ -28,10 +31,12 @@ sources:
       u: [850]
       t: [850]
       q: [850]
-
     level_coord: level
     time_method: mean
 
+  ###
+  # ERA5-Land
+  ###
   - path: ./data # /lfs/archive/Reanalysis/ERA5-Land/soil
     pattern: "ERA5-Land_*.nc" # glob pattern inside `path` (default "*.nc", "**/*.nc" = recursive)
     variables:
@@ -39,9 +44,17 @@ sources:
       - swvl2
       - swvl3
 
-    time_method: mean
+  ###
+  # Taiwan observation grid data
+  ###
+  - path: ./data # /lfs/archive/TCCIP_data/grid/day/0.05deg/tavg/v1
+    pattern: "tavg.*.nc" # glob pattern inside `path` (default "*.nc", "**/*.nc" = recursive)
+    variables:
+      - dis
+      - std
+    rename: { "dis": "tavg_dis", "std": "tavg_std" }
 
 # Optional metadata copied into the zarr attributes
-description: "Anemoi Zarr for HeatSense Project"
+description: "Anemoi Zarr for HeatSense"
 licence: "unknown"
 attribution: "TCCIP, ECMWF"
