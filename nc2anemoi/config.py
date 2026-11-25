@@ -8,7 +8,7 @@ import pandas as pd
 import yaml
 
 TIME_METHODS = ("auto", "exact", "ffill", "nearest", "interpolate", "mean")
-REQUIRED_KEYS = ("output", "period", "sources")
+REQUIRED_KEYS = ("period", "sources")
 
 
 class VarEntry(NamedTuple):
@@ -30,6 +30,9 @@ def load_config(path: str) -> dict:
             raise ValueError(f"config is missing '{key}'")
     if len(cfg["period"]) != 2:
         raise ValueError("'period' must be [start, end], e.g. ['200001', '201512']")
+
+    period_start, period_end = cfg["period"]
+    cfg.setdefault("output", f"anemoi_{period_start}-{period_end}.zarr")
 
     cfg.setdefault("frequency", "1D")
     cfg.setdefault("grid", {"reference": 0})
