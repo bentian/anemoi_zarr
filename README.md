@@ -20,7 +20,7 @@ anemoi_zarr/
 │   └── default_BIG.yaml     # production config, reads /lfs/archive/...
 ├── data/                    # local sample NetCDF files (git-ignored)
 ├── env/anemoi.yml           # conda environment
-├── graphics/                # overview.png, reader.png, timeutil.png
+├── graphics/                # diagrams used in this README
 └── src/
     ├── build_anemoi_zarr.py # entry point
     └── nc2anemoi/           # implementation package
@@ -183,13 +183,64 @@ unchanged; points outside a source domain become NaN. Longitudes are converted b
 
 ### 4. Align time (`timeutils.py`)
 
-`align_time()` puts each variable on the output dates. With `time_method: auto`:
+`align_time()` puts each variable on the output dates. Six methods are supported
+(set per source with `time_method`):
 
-- coarser source (e.g. monthly → daily): `ffill`, each step gets its period's value
-- finer source (e.g. hourly → daily): `mean` over each output step
-- same step: `exact` date matching
+| Method | What it does | Typical use |
+|---|---|---|
+| `auto` | Choose automatically (see below) | General case (default) |
+| `exact` | Match identical timestamps only; others become NaN | Daily → Daily |
+| `nearest` | Take the closest timestamp (within ± half an output step) | Timestamps slightly offset |
+| `ffill` | Carry the previous value forward | Monthly → Daily |
+| `interpolate` | Linear interpolation in time | Low-frequency, continuous variables |
+| `mean` | Average all source steps within each output step | Hourly → Daily |
 
-`nearest` and `interpolate` (linear in time) can be set explicitly per source.
+#### How `auto` chooses
+
+```python
+if src_step > step * 1.01:
+    return "ffill"   # source coarser than output
+if src_step < step * 0.99:
+    return "mean"    # source finer than output
+return "exact"       # same frequency
+```
+
+- `src_step`: median time interval of the source data
+- `step`: time interval of the output dataset (`frequency`)
+
+#### Conversion between frequencies
+
+![time_freq_convert](graphics/time_freq_convert.png)
+
+- **A. Hourly → Daily (`mean`)** – the 24 hourly values 00:00–23:00 are averaged into one
+  daily value (bins are left-closed and labelled with the start of the day).
+- **B. Monthly → Daily (`ffill`)** – every day of a month gets that month's value
+  (Jan 0.25 → 31 daily values of 0.25; Feb 0.30 → 28 daily values of 0.30).
+- **C. Daily → Daily (`exact`)** – one-to-one matching by date; a missing source date
+  stays NaN in the output.
+
+#### `ffill` in detail
+
+![ffill](graphics/ffill.png)
+
+Example: soil moisture observed every 3 days, output frequency daily.
+
+| Date | Original | After `ffill` |
+|---|---|---|
+| 01/01 | 0.30 | 0.30 |
+| 01/02 | NaN | 0.30 |
+| 01/03 | NaN | 0.30 |
+| 01/04 | 0.40 | 0.40 |
+| 01/05 | NaN | 0.40 |
+| 01/06 | NaN | 0.40 |
+| 01/07 | 0.25 | 0.25 |
+| 01/08 | NaN | 0.25 |
+| 01/09 | NaN | 0.25 |
+
+`ffill` does not compute new values; it carries the last available value forward, so the
+result is a stepwise time series. Values are only carried up to `1.5 × src_step` past the
+last source timestamp, so a gap at the end of the source data stays NaN instead of being
+filled indefinitely.
 
 ### 5. Write (`writer.py`)
 
