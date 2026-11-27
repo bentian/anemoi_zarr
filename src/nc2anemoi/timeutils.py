@@ -35,11 +35,27 @@ def _decode_cf(vals: np.ndarray, units: str, calendar: str) -> pd.DatetimeIndex:
 
 
 def _decode_integer_dates(ivals: np.ndarray) -> pd.DatetimeIndex | None:
-    """Decode YYYYMMDDHH / YYYYMMDD / YYYYMM integers, or return None."""
-    low, high = ivals.min(), ivals.max()
-    for min_val, max_val, fmt in _INT_FORMATS:
-        if min_val <= low and high <= max_val:
-            return pd.DatetimeIndex(pd.to_datetime(ivals.astype(str), format=fmt))
+    """Decode integer dates, including YYYYMMDD24 timestamps."""
+    lo, hi = ivals.min(), ivals.max()
+
+    for lower, upper, fmt in _INT_FORMATS:
+        if not (lower <= lo and hi <= upper):
+            continue
+
+        if fmt == "%Y%m%d%H":
+            dates = ivals // 100
+            hours = ivals % 100
+
+            if np.any(hours > 24):
+                raise ValueError(f"Invalid hourly timestamps: {ivals[hours > 24]}")
+
+            return pd.DatetimeIndex(
+                pd.to_datetime(dates.astype(str), format="%Y%m%d")
+                + pd.to_timedelta(hours, unit="h")
+            )
+
+        return pd.DatetimeIndex(pd.to_datetime(ivals.astype(str), format=fmt))
+
     return None
 
 

@@ -74,9 +74,9 @@ def build(cfg: dict, overwrite: bool = False, block: int = 366) -> str:
     target = make_target(cfg)
     entries = output_variables(cfg)
 
-    LOG.info("period %s -> %s, %d dates, step %s",
+    LOG.info("period [%s -> %s], %d timesteps, step [%s]",
              target.dates[0], target.dates[-1], target.ntime, target.step)
-    LOG.info("grid %d x %d  lat %.4f..%.4f  lon %.4f..%.4f", *target.field_shape,
+    LOG.info("grid [%d x %d]  lat [%.4f..%.4f]  lon [%.4f..%.4f]", *target.field_shape,
              target.lat[0], target.lat[-1], target.lon[0], target.lon[-1])
     LOG.info("variables: %s", [e.name for e in entries])
 
