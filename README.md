@@ -83,6 +83,10 @@ grid:
   # Option B: explicit grid [start, stop, step], inclusive
   lat: [5, 40, 0.25]
   lon: [100, 140, 0.25]
+  # Option C: crop the reference grid to [start, stop], keeping its native step
+  # reference: 0
+  # lat: [5, 40]
+  # lon: [100, 140]
   method: linear            # default regrid method: linear | nearest
 
 sources:
@@ -120,8 +124,21 @@ attribution: "TCCIP, ECMWF"
 | `period` | yes | – | `[start, end]`, inclusive, `YYYYMM` / `YYYYMMDD` / ISO |
 | `sources` | yes | – | List of source definitions (below) |
 | `frequency` | no | `1D` | Output time step |
-| `grid` | no | `{reference: 0}` | `reference: <index>` or explicit `lat` / `lon` |
+| `grid` | no | `{reference: 0}` | `reference: <index>` and/or `lat` / `lon` (see below) |
 | `grid.method` | no | `linear` | Default regrid method for all sources |
+
+### Grid options
+
+| `grid` setting | Result |
+|---|---|
+| `reference: N` only | Full native grid of source `N` |
+| `lat: [start, stop, step]`, `lon: [...]` | Regular grid with the given step |
+| `reference: N`, `lat: [start, stop]`, `lon: [start, stop]` | Native grid of source `N` cropped to the bounds — **keeps the native step**, so source `N` is copied without interpolation |
+| `lat` / `lon` with more than 3 values | Explicit coordinate lists |
+
+`lat` and `lon` are interpreted independently (e.g. `lat: [5, 40]`, `lon: [100, 140, 0.1]`).
+Longitude bounds may use either `[-180, 180)` or `[0, 360)`; the reference grid is converted
+to match. `reference` defaults to `0`.
 | `output` | no | `anemoi_<start>-<end>.zarr` | Output path |
 | `description`, `licence`, `attribution` | no | – | Copied into Zarr attributes |
 

@@ -16,13 +16,56 @@ def _axis(spec) -> np.ndarray:
     return np.asarray(spec, dtype="float64")
 
 
+def _to_lon_convention(lon: np.ndarray, bounds: tuple[float, float]) -> np.ndarray:
+    """Convert native longitudes to the [0, 360) / [-180, 180) convention of ``bounds``."""
+    low, high = bounds
+    if high <= 180 < lon.max():
+        return np.sort(((lon + 180) % 360) - 180)
+    if low < 0 <= lon.min():
+        return np.sort(lon % 360)
+    return lon
+
+
+def _crop(native: np.ndarray, bounds, name: str) -> np.ndarray:
+    """Native coordinates within [start, stop] (inclusive), keeping the native step."""
+    low, high = sorted(map(float, bounds))
+    if name == "lon":
+        native = _to_lon_convention(native, (low, high))
+    tol = 1e-6
+    sub = native[(native >= low - tol) & (native <= high + tol)]
+    if sub.size == 0:
+        raise ValueError(f"grid.{name} {list(bounds)} does not overlap the reference grid "
+                         f"({native.min()}..{native.max()})")
+    return sub
+
+
 def build_target_grid(cfg: dict) -> tuple[np.ndarray, np.ndarray]:
-    """Target lat/lon from explicit ``grid.lat/lon`` or a reference source."""
+    """Target lat/lon.
+
+    ``grid.lat`` / ``grid.lon`` may each be:
+      * ``[start, stop, step]`` – regular axis with the given step
+      * ``[start, stop]``       – crop the reference source grid, keeping its native step
+      * a longer list           – explicit coordinates
+    Without ``lat`` / ``lon`` the full grid of ``grid.reference`` is used.
+    """
     grid_cfg = cfg["grid"]
-    if "lat" in grid_cfg and "lon" in grid_cfg:
-        return np.sort(_axis(grid_cfg["lat"])), np.sort(_axis(grid_cfg["lon"]))
     ref = int(grid_cfg.get("reference", 0))
-    return read_grid(cfg["sources"][ref])
+    specs = {name: grid_cfg.get(name) for name in ("lat", "lon")}
+    if any(spec is None for spec in specs.values()):
+        if any(spec is not None for spec in specs.values()):
+            raise ValueError("grid: set both 'lat' and 'lon', or neither")
+        return read_grid(cfg["sources"][ref])
+
+    native = None
+    axes = []
+    for name, spec in specs.items():
+        if len(spec) == 2:
+            if native is None:
+                native = dict(zip(("lat", "lon"), read_grid(cfg["sources"][ref])))
+            axes.append(_crop(native[name], spec, name))
+        else:
+            axes.append(np.sort(_axis(spec)))
+    return axes[0], axes[1]
 
 
 def _match_lon_convention(da: xr.DataArray, tlon: np.ndarray) -> xr.DataArray:

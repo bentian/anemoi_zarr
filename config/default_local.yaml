@@ -3,7 +3,7 @@
 period: ["200101", "200101"]
 
 # Time step of the output dataset. Must be a fixed step (e.g. 1D, 6h, 24h).
-frequency: 1D
+frequency: 1h
 
 # Target grid that every variable gets interpolated onto.
 grid:
@@ -11,8 +11,14 @@ grid:
   # reference: 0 # ERA5 native grid is 720x1440
 
   # Option B: define the grid explicitly (start, stop, step), inclusive.
-  lat: [5, 40, 0.25]
-  lon: [100, 140, 0.25]
+  # lat: [5, 40, 0.25]
+  # lon: [100, 140, 0.25]
+
+  # Option C: crop the `reference` source grid to (start, stop), inclusive,
+  #           keeping its native grid step (no step given).
+  reference: 0
+  lat: [5, 40]
+  lon: [100, 140]
 
   method: linear # default regrid method: linear | nearest
 
