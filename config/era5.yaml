@@ -1,0 +1,31 @@
+# Time period (inclusive). YYYYMM or YYYYMMDD.
+# "201512" as the end means up to and including 2015-12-31.
+period: ["20100101", "20100103"]
+
+# Time step of the output dataset. Must be a fixed step (e.g. 1D, 6h, 24h).
+frequency: 1h
+
+# Target grid that every variable gets interpolated onto.
+grid:
+  reference: 0
+  lat: [5, 40]
+  lon: [100, 140]
+
+  method: linear # default regrid method: linear | nearest
+
+sources:
+  - path: /lfs/archive/Reanalysis/ERA5/PRS/1hr/
+    pattern: "[qtuvz]/2010/01/ERA5_*.nc" # glob pattern inside `path` (default "*.nc", "**/*.nc" = recursive)
+    variables:
+      z: [500]
+      v: [850]
+      u: [850]
+      t: [850]
+      q: [850]
+    level_coord: level
+    time_method: mean
+
+# Optional metadata copied into the zarr attributes
+description: "Anemoi Zarr for HeatSense"
+licence: "unknown"
+attribution: "ECMWF"

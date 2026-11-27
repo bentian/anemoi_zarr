@@ -32,9 +32,9 @@ def load_config(path: str) -> dict:
         raise ValueError("'period' must be [start, end], e.g. ['200001', '201512']")
 
     period_start, period_end = cfg["period"]
-    cfg.setdefault("output", f"anemoi_{period_start}-{period_end}.zarr")
-
     cfg.setdefault("frequency", "1D")
+    source_key = Path(path).stem
+    cfg.setdefault("output", f"anemoi_{source_key}_{period_start}-{period_end}_{cfg['frequency']}.zarr")
     cfg.setdefault("grid", {"reference": 0})
     cfg["grid"].setdefault("method", "linear")
 

@@ -49,14 +49,14 @@ def _process_source(src: dict, entries: list[VarEntry], target: Target,
         all_nan = np.isnan(values).all(axis=1)
         if all_nan.any():
             LOG.warning(
-                "%s: all-NaN dates: %d/%d, missing dates: %s",
+                "%s: all-NaN timesteps: %d/%d, missing timesteps: %s",
                 entry.name,
                 all_nan.sum(),
                 target.ntime,
-                target.dates[all_nan].strftime("%Y-%m-%d").tolist(),
+                target.dates[all_nan].strftime("%Y-%m-%d %H:00").tolist(),
             )
 
-        LOG.info("  %-12s -> %-12s time=%s, all-NaN dates: %d/%d", entry.source_name,
+        LOG.info("  %-12s -> %-12s time=%s, all-NaN timesteps: %d/%d", entry.source_name,
                  entry.name, used, int(np.isnan(values).all(axis=1).sum()), target.ntime)
         metadata[entry.name] = {
             "source_name": entry.source_name, "source_path": src["path"],
