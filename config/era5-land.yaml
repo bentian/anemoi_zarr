@@ -20,6 +20,7 @@ sources:
       - swvl1
       - swvl2
       - swvl3
+    time_method: causal_ffill # use May value for June timesteps (no look-ahead)
 
 # Optional metadata copied into the zarr attributes
 description: "Anemoi Zarr for HeatSense"

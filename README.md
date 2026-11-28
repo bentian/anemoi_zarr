@@ -151,7 +151,8 @@ to match. `reference` defaults to `0`.
 | `variables` | – | List of names, or mapping `name: [levels in hPa]` (`null` = no level) |
 | `level_coord` | `level` | Pressure coordinate; units `hPa`/`mb` or `Pa` are supported |
 | `rename` | `{}` | Output names, keyed by NetCDF name (`temp: tavg`) or expanded name (`t_850: t850`) |
-| `time_method` | `auto` | `auto`, `exact`, `ffill`, `nearest`, `interpolate`, `mean` |
+| `time_method` | `auto` | `auto`, `exact`, `ffill`, `causal_ffill`, `nearest`, `interpolate`, `mean` |
+| `lookback` | `32D` for `causal_ffill`, else none | Extra time read before the period start (e.g. `366D` for yearly sources) |
 | `regrid_method` | `grid.method` | `linear` or `nearest` |
 
 Variables with pressure levels are expanded to `<name>_<level>` (e.g. `z_500`, `t_850`).
@@ -200,7 +201,7 @@ unchanged; points outside a source domain become NaN. Longitudes are converted b
 
 ### 4. Align time (`timeutils.py`)
 
-`align_time()` puts each variable on the output dates. Six methods are supported
+`align_time()` puts each variable on the output dates. Seven methods are supported
 (set per source with `time_method`):
 
 | Method | What it does | Typical use |
@@ -209,6 +210,7 @@ unchanged; points outside a source domain become NaN. Longitudes are converted b
 | `exact` | Match identical timestamps only; others become NaN | Daily → Daily |
 | `nearest` | Take the closest timestamp (within ± half an output step) | Timestamps slightly offset |
 | `ffill` | Carry the previous value forward | Monthly → Daily |
+| `causal_ffill` | Carry a value forward only after its period has ended | Monthly → Daily without look-ahead (May value in June) |
 | `interpolate` | Linear interpolation in time | Low-frequency, continuous variables |
 | `mean` | Average all source steps within each output step | Hourly → Daily |
 
@@ -258,6 +260,33 @@ Example: soil moisture observed every 3 days, output frequency daily.
 result is a stepwise time series. Values are only carried up to `1.5 × src_step` past the
 last source timestamp, so a gap at the end of the source data stays NaN instead of being
 filled indefinitely.
+
+#### `causal_ffill` – no look-ahead
+
+With `ffill`, a monthly value stamped at the start of the month (e.g. ERA5-Land monthly
+means at `YYYY-MM-01`) is used for every day of **that** month — but the May mean is only
+known once May is over. `causal_ffill` re-stamps each value at the **end of its period**
+before forward filling, so the output only sees completed periods:
+
+| Output step | `ffill` | `causal_ffill` |
+|---|---|---|
+| 2001-05-31 23:00 | May | April |
+| 2001-06-01 00:00 | June | **May** |
+| 2001-06-30 23:00 | June | **May** |
+| 2001-07-01 00:00 | July | **June** |
+
+- Monthly / yearly sources use calendar periods: a value stamped anywhere in May becomes
+  available on June 1st 00:00. Other sources become available at `time + src_step`.
+- The previous period must be read too, so `lookback` defaults to `32D` (one month)
+  before the period start; use e.g. `366D` for yearly sources.
+- `causal_ffill` is never chosen by `auto`; set it explicitly:
+
+```yaml
+  - path: /lfs/archive/Reanalysis/ERA5-Land/soil/
+    pattern: "ERA5-Land_*.nc"
+    variables: [swvl1, swvl2, swvl3]
+    time_method: causal_ffill   # May soil moisture -> June timesteps
+```
 
 ### 5. Write (`writer.py`)
 

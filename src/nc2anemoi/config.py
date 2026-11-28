@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-TIME_METHODS = ("auto", "exact", "ffill", "nearest", "interpolate", "mean")
+TIME_METHODS = ("auto", "exact", "ffill", "causal_ffill", "nearest", "interpolate", "mean")
 REQUIRED_KEYS = ("period", "sources")
 
 
@@ -77,6 +77,10 @@ def _validate_source(i: int, src: dict, default_regrid: str) -> None:
     src.setdefault("regrid_method", default_regrid)
     if src["time_method"] not in TIME_METHODS:
         raise ValueError(f"source #{i}: time_method must be one of {TIME_METHODS}")
+    # Extra time read before the period start (causal_ffill needs the previous period)
+    src.setdefault("lookback", "32D" if src["time_method"] == "causal_ffill" else None)
+    if src["lookback"] is not None:
+        pd.to_timedelta(src["lookback"])  # validate, e.g. "32D", "366D", "6h"
 
 
 def variable_specs(src: dict):

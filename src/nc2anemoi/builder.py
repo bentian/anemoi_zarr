@@ -37,7 +37,10 @@ def _process_source(src: dict, entries: list[VarEntry], target: Target,
     """Read, regrid and time-align one source and write it; returns variable metadata."""
     LOG.info("source %d: %s (%s)", entries[0].source, src["path"], src["pattern"])
     buffer = max(target.step, MIN_READ_BUFFER)
-    arrays, attrs = read_source(src, target.dates[0] - buffer, target.dates[-1] + buffer)
+    lookback = buffer
+    if src.get("lookback") is not None:
+        lookback = max(buffer, pd.to_timedelta(src["lookback"]))
+    arrays, attrs = read_source(src, target.dates[0] - lookback, target.dates[-1] + buffer)
 
     metadata, aligned = {}, []
     for entry in entries:
@@ -74,6 +77,7 @@ def build(cfg: dict, overwrite: bool = False, block: int = 366) -> str:
     target = make_target(cfg)
     entries = output_variables(cfg)
 
+    print()
     LOG.info("period [%s -> %s], %d timesteps, step [%s]",
              target.dates[0], target.dates[-1], target.ntime, target.step)
     LOG.info("grid [%d x %d]  lat [%.4f..%.4f]  lon [%.4f..%.4f]", *target.field_shape,

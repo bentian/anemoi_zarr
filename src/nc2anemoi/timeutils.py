@@ -104,6 +104,20 @@ def resolve_time_method(method: str, src_step: pd.Timedelta, step: pd.Timedelta)
     return "exact"
 
 
+def available_from(times: pd.DatetimeIndex, src_step: pd.Timedelta) -> pd.DatetimeIndex:
+    """Time at which each source value becomes known: the end of its period.
+
+    Monthly / yearly sources use calendar periods, so a May value (stamped at any
+    time in May) becomes available on June 1st 00:00. Other sources are assumed
+    to be stamped at the start of their period: available at ``time + src_step``.
+    """
+    if pd.Timedelta(days=27) <= src_step <= pd.Timedelta(days=32):
+        return (times.to_period("M") + 1).to_timestamp()
+    if pd.Timedelta(days=360) <= src_step <= pd.Timedelta(days=367):
+        return (times.to_period("Y") + 1).to_timestamp()
+    return times + src_step
+
+
 def align_time(da: xr.DataArray, dates: pd.DatetimeIndex, step: pd.Timedelta,
                method: str) -> tuple[xr.DataArray, str]:
     """Put ``da`` on the output time axis; returns the array and the method used."""
@@ -117,6 +131,11 @@ def align_time(da: xr.DataArray, dates: pd.DatetimeIndex, step: pd.Timedelta,
         out = da.reindex(time=dates, method="nearest", tolerance=step / 2)
     elif method == "ffill":
         out = da.reindex(time=dates, method="ffill", tolerance=src_step * 1.5)
+    elif method == "causal_ffill":
+        # Re-stamp each value at the end of its period, then forward fill:
+        # output steps only see values whose period is already complete.
+        shifted = da.assign_coords(time=available_from(times, src_step))
+        out = shifted.reindex(time=dates, method="ffill", tolerance=src_step * 1.5)
     elif method == "interpolate":
         out = da.interp(time=dates)
     elif method == "mean":
